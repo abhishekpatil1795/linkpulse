@@ -1,6 +1,6 @@
 # LinkPulse
 
-URL shortener with per-link click analytics. Built with FastAPI, SQLAlchemy 2.0, PostgreSQL, JWT auth, Docker and GitHub Actions CI.
+URL shortener with per-link click analytics. Built with SQLAlchemy 2.0, PostgreSQL, JWT auth, Docker and GitHub Actions CI.
 
 ## Features
 - JWT authentication (bcrypt password hashing)
