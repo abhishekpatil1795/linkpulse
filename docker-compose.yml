@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: linkpulse
+      POSTGRES_PASSWORD: linkpulse
+      POSTGRES_DB: linkpulse
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U linkpulse"]
+      interval: 5s
+      retries: 10
+  api:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgresql://linkpulse:linkpulse@db:5432/linkpulse
+      SECRET_KEY: change-me-in-real-deployments
+      BASE_URL: http://localhost:8000
+    depends_on:
+      db: { condition: service_healthy }
+volumes:
+  pgdata:
