@@ -53,3 +53,33 @@ def test_other_user_cannot_see_stats(client, auth):
     client.post("/auth/register", json={"email": "c@d.com", "password": "password123"})
     t = client.post("/auth/login", data={"username": "c@d.com", "password": "password123"}).json()["access_token"]
     assert client.get(f"/links/{code}/stats", headers={"Authorization": f"Bearer {t}"}).status_code == 404
+
+
+def test_breakdown_title_and_patch(client, auth):
+    r = client.post("/links", json={"target_url": "https://example.com", "title": "Docs"}, headers=auth)
+    code = r.json()["code"]
+    client.get(f"/{code}", follow_redirects=False,
+               headers={"user-agent": "Mozilla/5.0 (iPhone) Safari/604.1 Mobile", "referer": "https://www.google.com/x"})
+    s = client.get(f"/links/{code}/stats", headers=auth).json()
+    assert s["title"] == "Docs"
+    assert s["devices"][0]["name"] == "Mobile"
+    assert s["browsers"][0]["name"] == "Safari"
+    assert s["referrers"][0]["name"] == "google.com"
+    p = client.patch(f"/links/{code}", json={"title": "Renamed"}, headers=auth)
+    assert p.status_code == 200 and p.json()["title"] == "Renamed"
+    listing = client.get("/links", headers=auth).json()
+    assert listing[0]["total_clicks"] == 1
+
+
+def test_qr_is_svg(client, auth):
+    code = client.post("/links", json={"target_url": "https://example.com"}, headers=auth).json()["code"]
+    r = client.get(f"/links/{code}/qr")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/svg+xml"
+    assert client.get("/links/nope/qr").status_code == 404
+
+
+def test_demo_session_and_home(client):
+    t = client.post("/auth/demo").json()["access_token"]
+    r = client.post("/links", json={"target_url": "https://example.com"}, headers={"Authorization": f"Bearer {t}"})
+    assert r.status_code == 201
+    assert client.get("/").status_code == 200

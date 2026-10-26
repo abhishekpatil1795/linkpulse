@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LinkPulse: short links that show who clicked</title>
+<meta name="description" content="Shorten a link and see where its clicks come from. Built with FastAPI and PostgreSQL.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233B36F5'/%3E%3Cpath d='M6 18h5l3-8 4 12 3-7h5' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#F2F4F8;--card:#fff;--ink:#0E1626;--mute:#5B6678;--line:#DCE1EB;--brand:#3B36F5;--brand-d:#2B27C9;--hi:#FFC53D;--err:#C2261B;
+--display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;--body:'Instrument Sans','Segoe UI',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,Consolas,monospace}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font:400 16px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+header{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+.logo{display:flex;align-items:center;gap:10px;font:800 1.25rem var(--display);letter-spacing:-.02em;text-decoration:none}
+.logo i{width:30px;height:30px;border-radius:9px;background:var(--brand);display:grid;place-items:center}
+nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+nav a,nav button{padding:8px 12px;border-radius:10px;border:0;background:none;text-decoration:none;font-weight:500;color:var(--mute)}
+nav a:hover,nav button:hover{color:var(--ink);background:#E6EAF2}
+nav .solid{background:var(--ink);color:#fff}
+nav .solid:hover{background:#26324A;color:#fff}
+.hero{padding:56px 0 40px}
+h1{font:800 clamp(2.5rem,7vw,4.9rem)/.98 var(--display);letter-spacing:-.035em;max-width:13ch}
+.lede{margin-top:20px;max-width:46ch;color:var(--mute);font-size:1.15rem}
+.shorten{margin-top:36px;background:var(--card);border:2px solid var(--ink);border-radius:18px;box-shadow:7px 7px 0 var(--brand);padding:8px}
+.row1{display:flex;gap:8px}
+.row1 input{flex:1;min-width:0;border:0;background:none;padding:16px 16px;font-size:1.1rem}
+.row1 input:focus-visible{outline:none}
+.btn{border:0;border-radius:12px;background:var(--brand);color:#fff;font-weight:600;padding:0 26px;min-height:54px}
+.btn:hover{background:var(--brand-d)}
+.btn[disabled]{opacity:.6;cursor:progress}
+.more{display:none;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 8px 8px;border-top:1px solid var(--line);margin-top:6px}
+.more.open{display:grid}
+.more label{display:grid;gap:4px;font-size:.85rem;color:var(--mute)}
+.more input,.more select{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;color:var(--ink)}
+.opts{margin:14px 4px 0;background:none;border:0;color:var(--mute);font-size:.92rem;text-decoration:underline;text-underline-offset:3px}
+.msg{min-height:1.5em;margin:14px 4px 0;color:var(--err);font-weight:500}
+.result{display:none;margin-top:24px;background:var(--ink);color:#fff;border-radius:16px;padding:18px 20px;gap:18px;align-items:center}
+.result.show{display:flex;animation:pop .35s ease-out}
+@keyframes pop{from{transform:translateY(8px);opacity:0}}
+.result .u{flex:1;min-width:0}
+.result .u b{display:block;font:500 1.25rem var(--mono);color:var(--hi);overflow-wrap:anywhere}
+.result .u span{display:block;color:#AEB7C9;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.result img{width:84px;height:84px;background:#fff;border-radius:8px;padding:4px}
+.ghost{border:1.5px solid #fff;background:none;color:#fff;border-radius:10px;padding:10px 16px;font-weight:600}
+.ghost:hover{background:#fff;color:var(--ink)}
+.ghost.dark{border-color:var(--ink);color:var(--ink)}
+.ghost.dark:hover{background:var(--ink);color:#fff}
+.guest{display:none;margin:0 0 6px;color:var(--mute);font-size:.95rem}
+section.links{padding:24px 0 72px;display:none}
+section.links.show{display:block}
+h2{font:700 1.6rem var(--display);letter-spacing:-.02em;margin-bottom:6px}
+.list{margin-top:16px;border-top:2px solid var(--ink)}
+.item{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:18px 8px}
+.item:hover{background:#E9EDF5}
+.item .c{font:500 1.05rem var(--mono);color:var(--brand)}
+.item .t{display:block;color:var(--mute);font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch}
+.item .n{font:800 1.9rem/1 var(--display);text-align:right}
+.item .n small{display:block;font:500 .78rem var(--body);color:var(--mute)}
+.empty{padding:28px 8px;color:var(--mute)}
+.how{border-top:1px solid var(--line);padding:36px 0 56px;color:var(--mute);font-size:.95rem}
+.how .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.how p{max-width:60ch}
+.scrim{position:fixed;inset:0;background:rgba(14,22,38,.45);display:none;z-index:20}
+.scrim.show{display:block}
+aside{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:#fff;border-left:2px solid var(--ink);z-index:21;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;padding:26px}
+aside.open{transform:none}
+aside .top{display:flex;justify-content:space-between;align-items:start;gap:12px}
+aside h3{font:700 1.4rem/1.15 var(--display);letter-spacing:-.02em;overflow-wrap:anywhere}
+.x{border:0;background:#E6EAF2;border-radius:10px;width:38px;height:38px;font-size:1.3rem;flex:none}
+.big{display:flex;align-items:end;gap:14px;margin:22px 0 4px}
+.big b{font:800 3.6rem/.9 var(--display);letter-spacing:-.04em}
+.big span{color:var(--mute);padding-bottom:6px}
+.surl{font:500 1rem var(--mono);color:var(--brand);overflow-wrap:anywhere}
+.bars{display:flex;align-items:end;gap:8px;height:130px;margin:18px 0 6px}
+.bars div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:.78rem;color:var(--mute)}
+.bars i{display:block;width:100%;background:var(--brand);border-radius:6px 6px 0 0;min-height:3px;opacity:.9}
+.bars i.max{background:var(--hi)}
+.bars em{font-style:normal;margin-top:6px}
+h4{font:700 1rem var(--body);margin:26px 0 8px}
+.bk{display:grid;grid-template-columns:96px 1fr 28px;gap:10px;align-items:center;font-size:.92rem;margin:6px 0}
+.bk span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bk i{display:block;height:10px;background:var(--brand);border-radius:5px}
+.bk b{text-align:right}
+.none{color:var(--mute);font-size:.92rem}
+.qrbox{display:flex;gap:16px;align-items:center;margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
+.qrbox img{width:110px;height:110px;border:1px solid var(--line);border-radius:8px;padding:4px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}
+dialog{border:2px solid var(--ink);border-radius:18px;padding:28px;width:min(400px,92vw);margin:auto;box-shadow:7px 7px 0 var(--brand)}
+dialog::backdrop{background:rgba(14,22,38,.45)}
+dialog form{display:grid;gap:12px}
+dialog h3{font:700 1.5rem var(--display);letter-spacing:-.02em}
+dialog label{display:grid;gap:4px;font-size:.88rem;color:var(--mute)}
+dialog input{border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--ink)}
+dialog .swap{background:none;border:0;color:var(--mute);text-decoration:underline;text-underline-offset:3px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;opacity:0;pointer-events:none;transition:.2s;z-index:40}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:700px){.more{grid-template-columns:1fr}.row1{flex-direction:column}.btn{min-height:52px}.result.show{flex-wrap:wrap}.hero{padding-top:28px}.shorten{box-shadow:5px 5px 0 var(--brand)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="logo" href="/"><i><svg width="18" height="18" viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h6l4-10 5 15 4-9h7"/></svg></i>LinkPulse</a>
+    <nav>
+      <a href="/docs">API docs</a>
+      <a href="https://github.com/abhishekpatil1795/linkpulse" target="_blank" rel="noopener">Source</a>
+      <span id="navAuth"></span>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Short links that show who clicked.</h1>
+      <p class="lede">Paste a long URL, get a short one, and see browsers, devices and referrers for every visit. No sign-up needed to try it.</p>
+      <form class="shorten" id="form" autocomplete="off">
+        <div class="row1">
+          <input id="url" type="url" required placeholder="Paste a long link, like https://example.com/…" aria-label="Long URL">
+          <button class="btn" id="go" type="submit">Shorten link</button>
+        </div>
+        <div class="more" id="more">
+          <label>Custom alias<input id="alias" maxlength="16" placeholder="my-link"></label>
+          <label>Title<input id="title" maxlength="120" placeholder="Launch post"></label>
+          <label>Expires<select id="exp"><option value="">Never</option><option value="1">In 1 day</option><option value="7">In 7 days</option><option value="30">In 30 days</option></select></label>
+        </div>
+      </form>
+      <button class="opts" id="opts" type="button" aria-expanded="false">Show options</button>
+      <p class="msg" id="msg" role="alert"></p>
+      <div class="result" id="result">
+        <img id="rqr" alt="QR code for the short link">
+        <div class="u"><b id="rshort"></b><span id="rlong"></span></div>
+        <button class="ghost" id="rcopy" type="button">Copy link</button>
+      </div>
+    </section>
+
+    <section class="links" id="links">
+      <p class="guest" id="guest">You are using a temporary guest session. <a href="#" id="guestSignup">Create an account</a> to keep your links.</p>
+      <h2>Your links</h2>
+      <p style="color:var(--mute)">Select a link to see its clicks, QR code and audience.</p>
+      <div class="list" id="list"></div>
+    </section>
+  </main>
+</div>
+
+<footer class="how"><div class="wrap">
+  <p>Built with FastAPI, PostgreSQL and Docker. Passwords are hashed with bcrypt, sessions use signed JWTs, and every push runs the test suite on GitHub Actions.</p>
+  <p><a href="https://github.com/abhishekpatil1795/linkpulse" target="_blank" rel="noopener">Read the source on GitHub</a></p>
+</div></footer>
+
+<div class="scrim" id="scrim"></div>
+<aside id="drawer" aria-label="Link details" aria-hidden="true"></aside>
+
+<dialog id="authDlg">
+  <form id="authForm" method="dialog">
+    <h3 id="authTitle">Sign in</h3>
+    <label>Email<input id="aemail" type="email" required autocomplete="email"></label>
+    <label>Password<input id="apass" type="password" required minlength="8" autocomplete="current-password"></label>
+    <p class="msg" id="amsg" style="margin:0;min-height:0"></p>
+    <button class="btn" id="asubmit" type="submit">Sign in</button>
+    <button class="swap" id="aswap" type="button">New here? Create an account</button>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let token=localStorage.getItem('lp_token')||'';
+let guest=localStorage.getItem('lp_guest')==='1';
+let who=localStorage.getItem('lp_who')||'';
+let mode='login';
+
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),1800)}
+async function copy(t){try{await navigator.clipboard.writeText(t);toast('Link copied')}catch{toast('Copy failed. Select and copy manually.')}}
+
+async function api(path,opt={}){
+  const h={...(opt.headers||{})};
+  if(token)h.Authorization='Bearer '+token;
+  if(opt.json){h['Content-Type']='application/json';opt.body=JSON.stringify(opt.json)}
+  const r=await fetch(path,{...opt,headers:h});
+  if(r.status===401&&token&&!opt.noAuthReset){signOut(true)}
+  let data=null;try{data=await r.json()}catch{}
+  if(!r.ok){
+    let d=data&&data.detail;
+    if(Array.isArray(d))d=d[0]&&d[0].msg?d[0].msg.replace(/^Value error, /,''):'Check your input';
+    const e=new Error(d||'Something went wrong');e.status=r.status;throw e
+  }
+  return data
+}
+function setSession(t,g,w){token=t;guest=g;who=w||'';localStorage.setItem('lp_token',t);localStorage.setItem('lp_guest',g?'1':'0');localStorage.setItem('lp_who',who);renderNav()}
+function signOut(expired){
+  token='';guest=false;who='';['lp_token','lp_guest','lp_who'].forEach(k=>localStorage.removeItem(k));
+  renderNav();$('links').classList.remove('show');closeDrawer();
+  if(expired===true)toast('Session expired. Shorten a link or sign in to continue.')
+}
+function renderNav(){
+  const n=$('navAuth');
+  if(token&&!guest){n.innerHTML=`<span style="color:var(--mute);padding:0 6px">${esc(who)}</span><button id="so">Sign out</button>`;$('so').onclick=()=>signOut()}
+  else if(token){n.innerHTML=`<button id="so">End guest session</button><button class="solid" id="su">Create account</button>`;$('so').onclick=()=>signOut();$('su').onclick=()=>openAuth('register')}
+  else{n.innerHTML=`<button id="si">Sign in</button><button class="solid" id="su">Create account</button>`;$('si').onclick=()=>openAuth('login');$('su').onclick=()=>openAuth('register')}
+  $('guest').style.display=token&&guest?'block':'none';
+}
+
+/* auth dialog */
+function openAuth(m){mode=m;paintAuth();$('amsg').textContent='';$('authDlg').showModal();$('aemail').focus()}
+function paintAuth(){
+  const reg=mode==='register';
+  $('authTitle').textContent=reg?'Create your account':'Sign in';
+  $('asubmit').textContent=reg?'Create account':'Sign in';
+  $('aswap').textContent=reg?'Have an account? Sign in':'New here? Create an account';
+  $('apass').autocomplete=reg?'new-password':'current-password';
+}
+$('aswap').onclick=()=>{mode=mode==='login'?'register':'login';paintAuth()};
+$('guestSignup').onclick=e=>{e.preventDefault();openAuth('register')};
+$('authForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const email=$('aemail').value.trim(),password=$('apass').value,b=$('asubmit');
+  b.disabled=true;$('amsg').textContent='';
+  try{
+    if(mode==='register')await api('/auth/register',{method:'POST',json:{email,password},noAuthReset:true});
+    const fd=new URLSearchParams({username:email,password});
+    const t=await api('/auth/login',{method:'POST',body:fd,headers:{'Content-Type':'application/x-www-form-urlencoded'},noAuthReset:true});
+    setSession(t.access_token,false,email.toLowerCase());
+    $('authDlg').close();toast(mode==='register'?'Account created':'Signed in');loadLinks()
+  }catch(err){$('amsg').textContent=err.message}
+  b.disabled=false
+});
+
+/* shorten */
+$('opts').onclick=()=>{const o=$('more').classList.toggle('open');$('opts').textContent=o?'Hide options':'Show options';$('opts').setAttribute('aria-expanded',o)};
+$('form').addEventListener('submit',async e=>{
+  e.preventDefault();$('msg').textContent='';
+  const btn=$('go');btn.disabled=true;btn.textContent='Shortening…';
+  try{
+    if(!token){const t=await api('/auth/demo',{method:'POST',noAuthReset:true});setSession(t.access_token,true,'')}
+    const body={target_url:$('url').value.trim()};
+    if($('alias').value.trim())body.custom_alias=$('alias').value.trim();
+    if($('title').value.trim())body.title=$('title').value.trim();
+    if($('exp').value)body.expires_in_days=+$('exp').value;
+    const l=await api('/links',{method:'POST',json:body});
+    showResult(l);$('url').value='';$('alias').value='';$('title').value='';
+    loadLinks()
+  }catch(err){$('msg').textContent=err.status===409?'That alias is taken. Try another one.':err.message}
+  btn.disabled=false;btn.textContent='Shorten link'
+});
+function showResult(l){
+  $('rshort').textContent=l.short_url.replace(/^https?:\/\//,'');
+  $('rlong').textContent=l.target_url;
+  $('rqr').src='/links/'+encodeURIComponent(l.code)+'/qr';
+  $('rcopy').onclick=()=>copy(l.short_url);
+  $('result').classList.add('show')
+}
+
+/* list */
+async function loadLinks(){
+  if(!token)return;
+  try{
+    const ls=await api('/links');
+    $('links').classList.add('show');
+    const box=$('list');
+    if(!ls.length){box.innerHTML='<p class="empty">No links yet. Paste a URL above to create your first one.</p>';return}
+    box.innerHTML='';
+    ls.forEach(l=>{
+      const b=document.createElement('button');b.className='item';
+      b.innerHTML=`<span><span class="c">/${esc(l.code)}</span>${l.title?` &nbsp;${esc(l.title)}`:''}<span class="t">${esc(l.target_url)}</span></span><span class="n">${l.total_clicks}<small>${l.total_clicks===1?'click':'clicks'}</small></span>`;
+      b.onclick=()=>openDrawer(l.code);box.appendChild(b)
+    })
+  }catch(err){if(err.status!==401)toast(err.message)}
+}
+
+/* drawer */
+function closeDrawer(){$('drawer').classList.remove('open');$('drawer').setAttribute('aria-hidden','true');$('scrim').classList.remove('show')}
+$('scrim').onclick=closeDrawer;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
+function breakdown(title,rows){
+  const max=Math.max(1,...rows.map(r=>r.clicks));
+  return `<h4>${title}</h4>`+(rows.length?rows.map(r=>`<div class="bk"><span>${esc(r.name)}</span><span><i style="width:${Math.max(6,r.clicks/max*100)}%"></i></span><b>${r.clicks}</b></div>`).join(''):'<p class="none">No data yet.</p>')
+}
+async function openDrawer(code){
+  const d=$('drawer');d.innerHTML='<p class="none">Loading…</p>';d.classList.add('open');d.setAttribute('aria-hidden','false');$('scrim').classList.add('show');
+  try{
+    const [s,ls]=await Promise.all([api('/links/'+encodeURIComponent(code)+'/stats'),api('/links')]);
+    const l=ls.find(x=>x.code===code)||{short_url:location.origin+'/'+code};
+    const map={};s.last_7_days.forEach(x=>map[x.date]=x.clicks);
+    const days=[];for(let i=6;i>=0;i--){const t=new Date(Date.now()-i*864e5).toISOString().slice(0,10);days.push({t,n:map[t]||0})}
+    const max=Math.max(1,...days.map(x=>x.n));
+    const bars=days.map(x=>`<div title="${x.n} clicks"><i class="${x.n===max&&x.n>0?'max':''}" style="height:${x.n/max*100}%"></i><em>${new Date(x.t+'T00:00:00Z').toLocaleDateString(undefined,{weekday:'short',timeZone:'UTC'})}</em></div>`).join('');
+    d.innerHTML=`<div class="top"><div><h3>${esc(s.title||'/'+s.code)}</h3><p class="surl">${esc(l.short_url.replace(/^https?:\/\//,''))}</p></div><button class="x" aria-label="Close" id="dx">×</button></div>
+    <div class="big"><b>${s.total_clicks}</b><span>${s.total_clicks===1?'total click':'total clicks'}</span></div>
+    ${s.total_clicks?'':'<p class="none">No clicks yet. Open the short link to record the first one.</p>'}
+    <h4>Last 7 days</h4><div class="bars">${bars}</div>
+    ${breakdown('Browsers',s.browsers)}${breakdown('Devices',s.devices)}${breakdown('Where clicks came from',s.referrers)}
+    <div class="qrbox"><img src="/links/${encodeURIComponent(code)}/qr" alt="QR code"><div><p style="font-weight:600">QR code</p><p class="none">Scans open the same short link.</p><a class="none" href="/links/${encodeURIComponent(code)}/qr" download="${esc(code)}.svg">Download SVG</a></div></div>
+    <p class="none" style="margin-top:20px;overflow-wrap:anywhere">Points to ${esc(s.target_url)}</p>
+    <div class="acts"><button class="ghost dark" id="dc">Copy link</button><button class="ghost dark" id="dr">Rename</button><button class="ghost dark" id="dd" style="border-color:var(--err);color:var(--err)">Delete</button></div>`;
+    $('dx').onclick=closeDrawer;$('dc').onclick=()=>copy(l.short_url);
+    $('dr').onclick=async()=>{const t=prompt('New title (leave empty to clear):',s.title||'');if(t===null)return;try{await api('/links/'+encodeURIComponent(code),{method:'PATCH',json:{title:t}});toast('Renamed');openDrawer(code);loadLinks()}catch(e){toast(e.message)}};
+    $('dd').onclick=async()=>{if(!confirm('Delete /'+code+'? Its short link will stop working.'))return;try{await api('/links/'+encodeURIComponent(code),{method:'DELETE'});closeDrawer();toast('Deleted');loadLinks()}catch(e){toast(e.message)}};
+    $('dx').focus()
+  }catch(err){d.innerHTML=`<div class="top"><h3>Could not load stats</h3><button class="x" id="dx" aria-label="Close">×</button></div><p class="none">${esc(err.message)}</p>`;$('dx').onclick=closeDrawer}
+}
+
+renderNav();loadLinks();
+</script>
+</body>
+</html>

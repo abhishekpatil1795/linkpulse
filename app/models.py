@@ -26,6 +26,7 @@ class Link(Base):
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
     owner: Mapped[User] = relationship(back_populates="links")
     clicks: Mapped[list["Click"]] = relationship(back_populates="link", cascade="all, delete-orphan")
 
@@ -36,4 +37,7 @@ class Click(Base):
     link_id: Mapped[int] = mapped_column(ForeignKey("links.id"), index=True)
     clicked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    browser: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    device: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    referrer: Mapped[str | None] = mapped_column(String(255), nullable=True)
     link: Mapped[Link] = relationship(back_populates="clicks")
